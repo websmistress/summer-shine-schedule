@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<!-- build: v8-firebase-sync -->
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Schedule — Elena Levanter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@200;300;400;500&display=swap" rel="stylesheet">
+<style>
+
+:root{
+  --bg:#F3E9F0; --p:#49277f; --p-lt:#8B60B8;
+  --p-pale:#EDE6F6;
+  --yt:#7A1F5E; --ig:#49277f; --mu:#C0A8D0;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{position:relative}
+body{background:var(--bg);color:var(--p);position:relative;
+  font-family:'Jost',sans-serif;overflow-x:hidden}
+
+/* per-month pearl container — strictly bounded within its own month section,
+   so pearls can never extend past the last visible calendar row */
+.month-pearls{position:absolute;top:0;left:0;width:100%;height:0;
+  z-index:0;pointer-events:none;overflow:visible}
+
+.porb{position:absolute;pointer-events:none}
+
+.porb-inner{
+  width:100%;height:100%;border-radius:50%;
+  background:
+    radial-gradient(circle at 32% 24%,rgba(255,255,255,.95) 0%,transparent 24%),
+    radial-gradient(circle at 60% 17%,rgba(255,255,255,.55) 0%,transparent 14%),
+    radial-gradient(circle at 48% 82%,rgba(255,230,242,.5) 0%,transparent 44%),
+    radial-gradient(circle at 26% 70%,rgba(210,224,250,.4) 0%,transparent 38%),
+    radial-gradient(ellipse at 50% 55%,
+      rgba(246,232,248,.6) 0%,rgba(228,212,240,.55) 35%,
+      rgba(214,226,248,.52) 65%,rgba(236,214,238,.55) 100%);
+  box-shadow:
+    0 0 22px 5px rgba(225,200,240,.16),
+    0 0 10px 2px rgba(255,230,242,.16),
+    0 4px 16px rgba(185,145,205,.1),
+    inset -6px -6px 16px rgba(150,105,165,.07),
+    inset  5px  5px 14px rgba(255,255,255,.5);
+  animation:pearlFloat var(--dur,7s) ease-in-out infinite;
+  animation-delay:var(--del,0s);
+}
+@keyframes pearlFloat{
+  0%,100%{ transform:translateY(0); }
+  50%{ transform:translateY(-9px); }
+}
+
+.hdr{text-align:center;padding:64px 24px 40px;position:relative;z-index:1}
+.hdr-eye{font-size:11px;font-weight:400;letter-spacing:.44em;text-transform:uppercase;
+  color:var(--mu);margin-bottom:14px}
+.hdr-title{font-size:clamp(60px,9vw,112px);font-weight:200;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--p);line-height:.88;margin-bottom:18px}
+.hdr-sub{font-size:11px;font-weight:300;letter-spacing:.44em;
+  text-transform:uppercase;color:var(--mu)}
+
+.cal{max-width:1140px;margin:0 auto;padding:0 28px 24px;position:relative;z-index:1}
+.month{margin-top:40px;position:relative}
+.mhd{display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;padding-bottom:10px;border-bottom:1px solid rgba(180,150,210,.18);
+  user-select:none;position:relative;z-index:1}
+.mhd:hover .mtitle{opacity:.65}
+.mtitle{font-size:clamp(22px,3vw,34px);font-weight:300;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--p);transition:opacity .2s}
+.mtog{font-size:22px;font-weight:200;color:var(--mu)}
+
+.mbody{position:relative;z-index:1}
+
+.dow-row{display:grid;grid-template-columns:repeat(7,1fr);
+  gap:9px;margin-top:10px}
+.dh{font-size:8px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--mu);display:flex;align-items:center;justify-content:center;
+  height:22px;padding-bottom:2px}
+
+.cgrid{display:grid;grid-template-columns:repeat(7,1fr);
+  grid-auto-rows:176px;gap:9px;margin-top:6px}
+
+.cell{
+  background:linear-gradient(140deg,
+      rgba(255,255,255,.46) 0%,rgba(255,255,255,.16) 50%,rgba(255,255,255,.30) 100%);
+  border:none;
+  border-radius:11px;padding:9px 8px 7px;
+  height:176px;overflow:hidden;
+  box-shadow:0 2px 12px rgba(180,140,220,.06);
+  transition:background .15s;
+}
+.cell:not(.empty):not(.pause):hover{
+  background-image:
+    linear-gradient(140deg,
+      rgba(255,255,255,.6) 0%,rgba(255,255,255,.26) 50%,rgba(255,255,255,.4) 100%);
+}
+
+.cell.today{
+  border:2px solid transparent;
+  background-image:
+    linear-gradient(140deg,
+      rgba(255,255,255,.46) 0%,rgba(255,255,255,.16) 50%,rgba(255,255,255,.30) 100%),
+    linear-gradient(125deg,#f6c9e2 0%,#d9c6f1 35%,#c3ddf6 65%,#eecdef 100%);
+  background-origin:border-box;
+  background-clip:padding-box, border-box;
+  box-shadow:0 0 12px 2px rgba(255,255,255,.4),
+             0 2px 14px rgba(190,150,210,.1);
+}
+.cell.past{opacity:.36}
+.cell.pause{opacity:.42}
+.cell.empty{background:transparent;border:none;box-shadow:none}
+
+.cn{margin-bottom:7px}
+.cnum{font-size:12px;font-weight:400;color:var(--p);display:inline-block;line-height:1}
+.today .cnum{background:var(--p);color:#fff;width:20px;height:20px;
+  border-radius:50%;display:inline-flex;align-items:center;
+  justify-content:center;font-size:10px}
+.p-pause{color:var(--mu);font-size:22px;font-weight:200;
+  text-align:center;margin-top:28px}
+
+.pc{margin-bottom:5px;border-radius:5px;padding:5px 6px 5px;
+  border:none;background:rgba(255,255,255,.16);overflow:hidden;
+  transition:opacity .2s}
+.pc.yt{border-left:2px solid var(--yt)}.pc.ig{border-left:2px solid var(--ig)}
+.pc.done{opacity:.38}
+.pc.done .pc-pl,.pc.done .pc-t{text-decoration:line-through;
+  text-decoration-color:var(--mu)}
+
+.pc-row{display:flex;align-items:center;gap:4px;margin-bottom:3px;min-width:0}
+.dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.dot.yt{background:var(--yt)}.dot.ig{background:var(--ig)}
+.pc-pl{font-size:9px;font-weight:400;letter-spacing:.07em;text-transform:uppercase;
+  flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc.yt .pc-pl{color:var(--yt)}.pc.ig .pc-pl{color:var(--ig)}
+.bd{font-size:7px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+  padding:1px 3px;border-radius:2px;flex-shrink:0;white-space:nowrap;color:var(--p-lt)}
+
+.pc-t{font-size:9px;font-weight:300;color:var(--p);white-space:nowrap;line-height:1.3}
+.pc-s{font-size:8px;font-weight:300;color:var(--mu)}
+
+.pcb{
+  width:13px;height:13px;border-radius:50%;
+  flex-shrink:0;cursor:pointer;display:inline-block;
+  background:
+    radial-gradient(circle at 35% 30%,rgba(255,255,255,.9) 0%,transparent 30%),
+    radial-gradient(ellipse at 50% 60%,
+      rgba(252,210,235,.55) 0%,rgba(235,175,210,.5) 60%,rgba(220,150,195,.55) 100%);
+  box-shadow:0 1px 4px rgba(200,130,175,.22),inset 0 1px 0 rgba(255,255,255,.55);
+  transition:background .35s ease,box-shadow .2s;
+}
+.pcb:hover{box-shadow:0 2px 7px rgba(200,130,175,.34),inset 0 1px 0 rgba(255,255,255,.55)}
+.pcb.checked{
+  background:
+    radial-gradient(circle at 35% 30%,rgba(255,255,255,.9) 0%,transparent 30%),
+    radial-gradient(ellipse at 50% 58%,
+      rgba(200,180,235,.95) 0%,rgba(155,110,205,.9) 50%,rgba(120,75,180,.92) 100%);
+  box-shadow:0 1px 6px rgba(120,75,180,.38),inset 0 1px 0 rgba(255,255,255,.4);
+}
+
+@media (max-width: 700px) {
+  .cal{padding:0 14px 24px}
+  .hdr-title{font-size:clamp(42px,14vw,80px)}
+
+  /* Horizontal scroll per month — cells get proper width */
+  .mbody{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:10px}
+  .dow-row,.cgrid{grid-template-columns:repeat(7,95px);gap:6px}
+
+  /* Slightly more readable text */
+  .pc-t{font-size:10px}
+  .pc-pl{font-size:9px}
+  .cnum{font-size:13px}
+  .today .cnum{width:22px;height:22px;font-size:11px}
+}
+
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-eye">Elena Levanter</div>
+  <div class="hdr-title">Schedule</div>
+  <div class="hdr-sub">Summer 2026 &nbsp;&middot;&nbsp; Paris</div>
+</header>
+
+<main class="cal">
+<section class="month" id="m20266">
+<div class="month-pearls" id="mp-m20266"></div>
+<div class="mhd" onclick="togM('m20266')">
+  <span class="mtitle">June 2026</span><span class="mtog" id="tog-m20266">−</span>
+</div>
+<div class="mbody" id="body-m20266">
+<div class="dow-row">
+  <div class="dh">Mon</div><div class="dh">Tue</div><div class="dh">Wed</div>
+  <div class="dh">Thu</div><div class="dh">Fri</div><div class="dh">Sat</div>
+  <div class="dh">Sun</div>
+</div>
+<div class="cgrid"><div class="cell"><div class="cn"><span class="cnum">15</span></div><div class="pc yt done" data-id="2026-06-15-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="bd opt">opt</span><span class="pcb checked" id="pcb-2026-06-15-yt-0" onclick="pcbTgl(this,'2026-06-15-yt-0')"></span></div>
+<div class="pc-t">12:30 PM&thinsp;<span class="pc-s">· 3:30 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">16</span></div><div class="pc ig done" data-id="2026-06-16-ig-0">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb checked" id="pcb-2026-06-16-ig-0" onclick="pcbTgl(this,'2026-06-16-ig-0')"></span></div>
+<div class="pc-t">9:30 PM&thinsp;<span class="pc-s">· 12:30 AM Wed</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">17</span></div><div class="pc yt" data-id="2026-06-17-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-06-17-yt-0" onclick="pcbTgl(this,'2026-06-17-yt-0')"></span></div>
+<div class="pc-t">1:00 PM&thinsp;<span class="pc-s">· 4:00 PM</span></div>
+</div><div class="pc ig" data-id="2026-06-17-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-06-17-ig-1" onclick="pcbTgl(this,'2026-06-17-ig-1')"></span></div>
+<div class="pc-t">8:00 PM&thinsp;<span class="pc-s">· 11:00 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">18</span></div><div class="pc yt" data-id="2026-06-18-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-06-18-yt-0" onclick="pcbTgl(this,'2026-06-18-yt-0')"></span></div>
+<div class="pc-t">6:30 PM&thinsp;<span class="pc-s">· 9:30 PM</span></div>
+</div><div class="pc ig" data-id="2026-06-18-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="bd peak">&#9825;</span><span class="pcb" id="pcb-2026-06-18-ig-1" onclick="pcbTgl(this,'2026-06-18-ig-1')"></span></div>
+<div class="pc-t">9:00 PM&thinsp;<span class="pc-s">· 12:00 AM Fri</span></div>
+</div></div><div class="cell pause"><div class="cn"><span class="cnum">19</span></div><div class="p-pause">·</div></div><div class="cell pause"><div class="cn"><span class="cnum">20</span></div><div class="p-pause">·</div></div><div class="cell"><div class="cn"><span class="cnum">21</span></div><div class="pc yt" data-id="2026-06-21-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Video</span><span class="pcb" id="pcb-2026-06-21-yt-0" onclick="pcbTgl(this,'2026-06-21-yt-0')"></span></div>
+<div class="pc-t">3–4 PM&thinsp;<span class="pc-s">· 6–7 PM</span></div>
+</div><div class="pc ig" data-id="2026-06-21-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-06-21-ig-1" onclick="pcbTgl(this,'2026-06-21-ig-1')"></span></div>
+<div class="pc-t">9:45 PM&thinsp;<span class="pc-s">· 12:45 AM Mon</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">22</span></div><div class="pc yt" data-id="2026-06-22-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="bd opt">opt</span><span class="pcb" id="pcb-2026-06-22-yt-0" onclick="pcbTgl(this,'2026-06-22-yt-0')"></span></div>
+<div class="pc-t">12:30 PM&thinsp;<span class="pc-s">· 3:30 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">23</span></div><div class="pc ig" data-id="2026-06-23-ig-0">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-06-23-ig-0" onclick="pcbTgl(this,'2026-06-23-ig-0')"></span></div>
+<div class="pc-t">9:30 PM&thinsp;<span class="pc-s">· 12:30 AM Wed</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">24</span></div><div class="pc yt" data-id="2026-06-24-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-06-24-yt-0" onclick="pcbTgl(this,'2026-06-24-yt-0')"></span></div>
+<div class="pc-t">1:00 PM&thinsp;<span class="pc-s">· 4:00 PM</span></div>
+</div><div class="pc ig" data-id="2026-06-24-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-06-24-ig-1" onclick="pcbTgl(this,'2026-06-24-ig-1')"></span></div>
+<div class="pc-t">8:00 PM&thinsp;<span class="pc-s">· 11:00 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">25</span></div><div class="pc yt" data-id="2026-06-25-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-06-25-yt-0" onclick="pcbTgl(this,'2026-06-25-yt-0')"></span></div>
+<div class="pc-t">6:30 PM&thinsp;<span class="pc-s">· 9:30 PM</span></div>
+</div><div class="pc ig" data-id="2026-06-25-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="bd peak">&#9825;</span><span class="pcb" id="pcb-2026-06-25-ig-1" onclick="pcbTgl(this,'2026-06-25-ig-1')"></span></div>
+<div class="pc-t">9:00 PM&thinsp;<span class="pc-s">· 12:00 AM Fri</span></div>
+</div></div><div class="cell pause"><div class="cn"><span class="cnum">26</span></div><div class="p-pause">·</div></div><div class="cell pause"><div class="cn"><span class="cnum">27</span></div><div class="p-pause">·</div></div><div class="cell"><div class="cn"><span class="cnum">28</span></div><div class="pc yt" data-id="2026-06-28-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Video</span><span class="pcb" id="pcb-2026-06-28-yt-0" onclick="pcbTgl(this,'2026-06-28-yt-0')"></span></div>
+<div class="pc-t">3–4 PM&thinsp;<span class="pc-s">· 6–7 PM</span></div>
+</div><div class="pc ig" data-id="2026-06-28-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-06-28-ig-1" onclick="pcbTgl(this,'2026-06-28-ig-1')"></span></div>
+<div class="pc-t">9:45 PM&thinsp;<span class="pc-s">· 12:45 AM Mon</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">29</span></div><div class="pc yt" data-id="2026-06-29-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="bd opt">opt</span><span class="pcb" id="pcb-2026-06-29-yt-0" onclick="pcbTgl(this,'2026-06-29-yt-0')"></span></div>
+<div class="pc-t">12:30 PM&thinsp;<span class="pc-s">· 3:30 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">30</span></div><div class="pc ig" data-id="2026-06-30-ig-0">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-06-30-ig-0" onclick="pcbTgl(this,'2026-06-30-ig-0')"></span></div>
+<div class="pc-t">9:30 PM&thinsp;<span class="pc-s">· 12:30 AM Wed</span></div>
+</div></div><div class="cell empty"></div><div class="cell empty"></div><div class="cell empty"></div><div class="cell empty"></div><div class="cell empty"></div></div>
+</div></section><section class="month" id="m20267">
+<div class="month-pearls" id="mp-m20267"></div>
+<div class="mhd" onclick="togM('m20267')">
+  <span class="mtitle">July 2026</span><span class="mtog" id="tog-m20267">−</span>
+</div>
+<div class="mbody" id="body-m20267">
+<div class="dow-row">
+  <div class="dh">Mon</div><div class="dh">Tue</div><div class="dh">Wed</div>
+  <div class="dh">Thu</div><div class="dh">Fri</div><div class="dh">Sat</div>
+  <div class="dh">Sun</div>
+</div>
+<div class="cgrid"><div class="cell empty"></div><div class="cell empty"></div><div class="cell"><div class="cn"><span class="cnum">1</span></div><div class="pc yt" data-id="2026-07-01-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-07-01-yt-0" onclick="pcbTgl(this,'2026-07-01-yt-0')"></span></div>
+<div class="pc-t">1:00 PM&thinsp;<span class="pc-s">· 4:00 PM</span></div>
+</div><div class="pc ig" data-id="2026-07-01-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-07-01-ig-1" onclick="pcbTgl(this,'2026-07-01-ig-1')"></span></div>
+<div class="pc-t">8:00 PM&thinsp;<span class="pc-s">· 11:00 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">2</span></div><div class="pc yt" data-id="2026-07-02-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-07-02-yt-0" onclick="pcbTgl(this,'2026-07-02-yt-0')"></span></div>
+<div class="pc-t">6:30 PM&thinsp;<span class="pc-s">· 9:30 PM</span></div>
+</div><div class="pc ig" data-id="2026-07-02-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="bd peak">&#9825;</span><span class="pcb" id="pcb-2026-07-02-ig-1" onclick="pcbTgl(this,'2026-07-02-ig-1')"></span></div>
+<div class="pc-t">9:00 PM&thinsp;<span class="pc-s">· 12:00 AM Fri</span></div>
+</div></div><div class="cell pause"><div class="cn"><span class="cnum">3</span></div><div class="p-pause">·</div></div><div class="cell pause"><div class="cn"><span class="cnum">4</span></div><div class="p-pause">·</div></div><div class="cell"><div class="cn"><span class="cnum">5</span></div><div class="pc yt" data-id="2026-07-05-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Video</span><span class="pcb" id="pcb-2026-07-05-yt-0" onclick="pcbTgl(this,'2026-07-05-yt-0')"></span></div>
+<div class="pc-t">3–4 PM&thinsp;<span class="pc-s">· 6–7 PM</span></div>
+</div><div class="pc ig" data-id="2026-07-05-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-07-05-ig-1" onclick="pcbTgl(this,'2026-07-05-ig-1')"></span></div>
+<div class="pc-t">9:45 PM&thinsp;<span class="pc-s">· 12:45 AM Mon</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">6</span></div><div class="pc yt" data-id="2026-07-06-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="bd opt">opt</span><span class="pcb" id="pcb-2026-07-06-yt-0" onclick="pcbTgl(this,'2026-07-06-yt-0')"></span></div>
+<div class="pc-t">12:30 PM&thinsp;<span class="pc-s">· 3:30 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">7</span></div><div class="pc ig" data-id="2026-07-07-ig-0">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-07-07-ig-0" onclick="pcbTgl(this,'2026-07-07-ig-0')"></span></div>
+<div class="pc-t">9:30 PM&thinsp;<span class="pc-s">· 12:30 AM Wed</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">8</span></div><div class="pc yt" data-id="2026-07-08-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-07-08-yt-0" onclick="pcbTgl(this,'2026-07-08-yt-0')"></span></div>
+<div class="pc-t">1:00 PM&thinsp;<span class="pc-s">· 4:00 PM</span></div>
+</div><div class="pc ig" data-id="2026-07-08-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-07-08-ig-1" onclick="pcbTgl(this,'2026-07-08-ig-1')"></span></div>
+<div class="pc-t">8:00 PM&thinsp;<span class="pc-s">· 11:00 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">9</span></div><div class="pc yt" data-id="2026-07-09-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-07-09-yt-0" onclick="pcbTgl(this,'2026-07-09-yt-0')"></span></div>
+<div class="pc-t">6:30 PM&thinsp;<span class="pc-s">· 9:30 PM</span></div>
+</div><div class="pc ig" data-id="2026-07-09-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="bd peak">&#9825;</span><span class="pcb" id="pcb-2026-07-09-ig-1" onclick="pcbTgl(this,'2026-07-09-ig-1')"></span></div>
+<div class="pc-t">9:00 PM&thinsp;<span class="pc-s">· 12:00 AM Fri</span></div>
+</div></div><div class="cell pause"><div class="cn"><span class="cnum">10</span></div><div class="p-pause">·</div></div><div class="cell pause"><div class="cn"><span class="cnum">11</span></div><div class="p-pause">·</div></div><div class="cell"><div class="cn"><span class="cnum">12</span></div><div class="pc yt" data-id="2026-07-12-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Video</span><span class="pcb" id="pcb-2026-07-12-yt-0" onclick="pcbTgl(this,'2026-07-12-yt-0')"></span></div>
+<div class="pc-t">3–4 PM&thinsp;<span class="pc-s">· 6–7 PM</span></div>
+</div><div class="pc ig" data-id="2026-07-12-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-07-12-ig-1" onclick="pcbTgl(this,'2026-07-12-ig-1')"></span></div>
+<div class="pc-t">9:45 PM&thinsp;<span class="pc-s">· 12:45 AM Mon</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">13</span></div><div class="pc yt" data-id="2026-07-13-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="bd opt">opt</span><span class="pcb" id="pcb-2026-07-13-yt-0" onclick="pcbTgl(this,'2026-07-13-yt-0')"></span></div>
+<div class="pc-t">12:30 PM&thinsp;<span class="pc-s">· 3:30 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">14</span></div><div class="pc ig" data-id="2026-07-14-ig-0">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-07-14-ig-0" onclick="pcbTgl(this,'2026-07-14-ig-0')"></span></div>
+<div class="pc-t">9:30 PM&thinsp;<span class="pc-s">· 12:30 AM Wed</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">15</span></div><div class="pc yt" data-id="2026-07-15-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-07-15-yt-0" onclick="pcbTgl(this,'2026-07-15-yt-0')"></span></div>
+<div class="pc-t">1:00 PM&thinsp;<span class="pc-s">· 4:00 PM</span></div>
+</div><div class="pc ig" data-id="2026-07-15-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-07-15-ig-1" onclick="pcbTgl(this,'2026-07-15-ig-1')"></span></div>
+<div class="pc-t">8:00 PM&thinsp;<span class="pc-s">· 11:00 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">16</span></div><div class="pc yt" data-id="2026-07-16-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-07-16-yt-0" onclick="pcbTgl(this,'2026-07-16-yt-0')"></span></div>
+<div class="pc-t">6:30 PM&thinsp;<span class="pc-s">· 9:30 PM</span></div>
+</div><div class="pc ig" data-id="2026-07-16-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="bd peak">&#9825;</span><span class="pcb" id="pcb-2026-07-16-ig-1" onclick="pcbTgl(this,'2026-07-16-ig-1')"></span></div>
+<div class="pc-t">9:00 PM&thinsp;<span class="pc-s">· 12:00 AM Fri</span></div>
+</div></div><div class="cell pause"><div class="cn"><span class="cnum">17</span></div><div class="p-pause">·</div></div><div class="cell pause"><div class="cn"><span class="cnum">18</span></div><div class="p-pause">·</div></div><div class="cell"><div class="cn"><span class="cnum">19</span></div><div class="pc yt" data-id="2026-07-19-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Video</span><span class="pcb" id="pcb-2026-07-19-yt-0" onclick="pcbTgl(this,'2026-07-19-yt-0')"></span></div>
+<div class="pc-t">3–4 PM&thinsp;<span class="pc-s">· 6–7 PM</span></div>
+</div><div class="pc ig" data-id="2026-07-19-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-07-19-ig-1" onclick="pcbTgl(this,'2026-07-19-ig-1')"></span></div>
+<div class="pc-t">9:45 PM&thinsp;<span class="pc-s">· 12:45 AM Mon</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">20</span></div><div class="pc yt" data-id="2026-07-20-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="bd opt">opt</span><span class="pcb" id="pcb-2026-07-20-yt-0" onclick="pcbTgl(this,'2026-07-20-yt-0')"></span></div>
+<div class="pc-t">12:30 PM&thinsp;<span class="pc-s">· 3:30 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">21</span></div><div class="pc ig" data-id="2026-07-21-ig-0">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-07-21-ig-0" onclick="pcbTgl(this,'2026-07-21-ig-0')"></span></div>
+<div class="pc-t">9:30 PM&thinsp;<span class="pc-s">· 12:30 AM Wed</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">22</span></div><div class="pc yt" data-id="2026-07-22-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-07-22-yt-0" onclick="pcbTgl(this,'2026-07-22-yt-0')"></span></div>
+<div class="pc-t">1:00 PM&thinsp;<span class="pc-s">· 4:00 PM</span></div>
+</div><div class="pc ig" data-id="2026-07-22-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-07-22-ig-1" onclick="pcbTgl(this,'2026-07-22-ig-1')"></span></div>
+<div class="pc-t">8:00 PM&thinsp;<span class="pc-s">· 11:00 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">23</span></div><div class="pc yt" data-id="2026-07-23-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-07-23-yt-0" onclick="pcbTgl(this,'2026-07-23-yt-0')"></span></div>
+<div class="pc-t">6:30 PM&thinsp;<span class="pc-s">· 9:30 PM</span></div>
+</div><div class="pc ig" data-id="2026-07-23-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="bd peak">&#9825;</span><span class="pcb" id="pcb-2026-07-23-ig-1" onclick="pcbTgl(this,'2026-07-23-ig-1')"></span></div>
+<div class="pc-t">9:00 PM&thinsp;<span class="pc-s">· 12:00 AM Fri</span></div>
+</div></div><div class="cell pause"><div class="cn"><span class="cnum">24</span></div><div class="p-pause">·</div></div><div class="cell pause"><div class="cn"><span class="cnum">25</span></div><div class="p-pause">·</div></div><div class="cell"><div class="cn"><span class="cnum">26</span></div><div class="pc yt" data-id="2026-07-26-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Video</span><span class="pcb" id="pcb-2026-07-26-yt-0" onclick="pcbTgl(this,'2026-07-26-yt-0')"></span></div>
+<div class="pc-t">3–4 PM&thinsp;<span class="pc-s">· 6–7 PM</span></div>
+</div><div class="pc ig" data-id="2026-07-26-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-07-26-ig-1" onclick="pcbTgl(this,'2026-07-26-ig-1')"></span></div>
+<div class="pc-t">9:45 PM&thinsp;<span class="pc-s">· 12:45 AM Mon</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">27</span></div><div class="pc yt" data-id="2026-07-27-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="bd opt">opt</span><span class="pcb" id="pcb-2026-07-27-yt-0" onclick="pcbTgl(this,'2026-07-27-yt-0')"></span></div>
+<div class="pc-t">12:30 PM&thinsp;<span class="pc-s">· 3:30 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">28</span></div><div class="pc ig" data-id="2026-07-28-ig-0">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-07-28-ig-0" onclick="pcbTgl(this,'2026-07-28-ig-0')"></span></div>
+<div class="pc-t">9:30 PM&thinsp;<span class="pc-s">· 12:30 AM Wed</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">29</span></div><div class="pc yt" data-id="2026-07-29-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-07-29-yt-0" onclick="pcbTgl(this,'2026-07-29-yt-0')"></span></div>
+<div class="pc-t">1:00 PM&thinsp;<span class="pc-s">· 4:00 PM</span></div>
+</div><div class="pc ig" data-id="2026-07-29-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-07-29-ig-1" onclick="pcbTgl(this,'2026-07-29-ig-1')"></span></div>
+<div class="pc-t">8:00 PM&thinsp;<span class="pc-s">· 11:00 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">30</span></div><div class="pc yt" data-id="2026-07-30-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-07-30-yt-0" onclick="pcbTgl(this,'2026-07-30-yt-0')"></span></div>
+<div class="pc-t">6:30 PM&thinsp;<span class="pc-s">· 9:30 PM</span></div>
+</div><div class="pc ig" data-id="2026-07-30-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="bd peak">&#9825;</span><span class="pcb" id="pcb-2026-07-30-ig-1" onclick="pcbTgl(this,'2026-07-30-ig-1')"></span></div>
+<div class="pc-t">9:00 PM&thinsp;<span class="pc-s">· 12:00 AM Fri</span></div>
+</div></div><div class="cell pause"><div class="cn"><span class="cnum">31</span></div><div class="p-pause">·</div></div><div class="cell empty"></div><div class="cell empty"></div></div>
+</div></section><section class="month" id="m20268">
+<div class="month-pearls" id="mp-m20268"></div>
+<div class="mhd" onclick="togM('m20268')">
+  <span class="mtitle">August 2026</span><span class="mtog" id="tog-m20268">−</span>
+</div>
+<div class="mbody" id="body-m20268">
+<div class="dow-row">
+  <div class="dh">Mon</div><div class="dh">Tue</div><div class="dh">Wed</div>
+  <div class="dh">Thu</div><div class="dh">Fri</div><div class="dh">Sat</div>
+  <div class="dh">Sun</div>
+</div>
+<div class="cgrid"><div class="cell empty"></div><div class="cell empty"></div><div class="cell empty"></div><div class="cell empty"></div><div class="cell empty"></div><div class="cell pause"><div class="cn"><span class="cnum">1</span></div><div class="p-pause">·</div></div><div class="cell"><div class="cn"><span class="cnum">2</span></div><div class="pc yt" data-id="2026-08-02-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Video</span><span class="pcb" id="pcb-2026-08-02-yt-0" onclick="pcbTgl(this,'2026-08-02-yt-0')"></span></div>
+<div class="pc-t">3–4 PM&thinsp;<span class="pc-s">· 6–7 PM</span></div>
+</div><div class="pc ig" data-id="2026-08-02-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-08-02-ig-1" onclick="pcbTgl(this,'2026-08-02-ig-1')"></span></div>
+<div class="pc-t">9:45 PM&thinsp;<span class="pc-s">· 12:45 AM Mon</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">3</span></div><div class="pc yt" data-id="2026-08-03-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="bd opt">opt</span><span class="pcb" id="pcb-2026-08-03-yt-0" onclick="pcbTgl(this,'2026-08-03-yt-0')"></span></div>
+<div class="pc-t">12:30 PM&thinsp;<span class="pc-s">· 3:30 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">4</span></div><div class="pc ig" data-id="2026-08-04-ig-0">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-08-04-ig-0" onclick="pcbTgl(this,'2026-08-04-ig-0')"></span></div>
+<div class="pc-t">9:30 PM&thinsp;<span class="pc-s">· 12:30 AM Wed</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">5</span></div><div class="pc yt" data-id="2026-08-05-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-08-05-yt-0" onclick="pcbTgl(this,'2026-08-05-yt-0')"></span></div>
+<div class="pc-t">1:00 PM&thinsp;<span class="pc-s">· 4:00 PM</span></div>
+</div><div class="pc ig" data-id="2026-08-05-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-08-05-ig-1" onclick="pcbTgl(this,'2026-08-05-ig-1')"></span></div>
+<div class="pc-t">8:00 PM&thinsp;<span class="pc-s">· 11:00 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">6</span></div><div class="pc yt" data-id="2026-08-06-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-08-06-yt-0" onclick="pcbTgl(this,'2026-08-06-yt-0')"></span></div>
+<div class="pc-t">6:30 PM&thinsp;<span class="pc-s">· 9:30 PM</span></div>
+</div><div class="pc ig" data-id="2026-08-06-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="bd peak">&#9825;</span><span class="pcb" id="pcb-2026-08-06-ig-1" onclick="pcbTgl(this,'2026-08-06-ig-1')"></span></div>
+<div class="pc-t">9:00 PM&thinsp;<span class="pc-s">· 12:00 AM Fri</span></div>
+</div></div><div class="cell pause"><div class="cn"><span class="cnum">7</span></div><div class="p-pause">·</div></div><div class="cell pause"><div class="cn"><span class="cnum">8</span></div><div class="p-pause">·</div></div><div class="cell"><div class="cn"><span class="cnum">9</span></div><div class="pc yt" data-id="2026-08-09-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Video</span><span class="pcb" id="pcb-2026-08-09-yt-0" onclick="pcbTgl(this,'2026-08-09-yt-0')"></span></div>
+<div class="pc-t">3–4 PM&thinsp;<span class="pc-s">· 6–7 PM</span></div>
+</div><div class="pc ig" data-id="2026-08-09-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-08-09-ig-1" onclick="pcbTgl(this,'2026-08-09-ig-1')"></span></div>
+<div class="pc-t">9:45 PM&thinsp;<span class="pc-s">· 12:45 AM Mon</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">10</span></div><div class="pc yt" data-id="2026-08-10-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="bd opt">opt</span><span class="pcb" id="pcb-2026-08-10-yt-0" onclick="pcbTgl(this,'2026-08-10-yt-0')"></span></div>
+<div class="pc-t">12:30 PM&thinsp;<span class="pc-s">· 3:30 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">11</span></div><div class="pc ig" data-id="2026-08-11-ig-0">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-08-11-ig-0" onclick="pcbTgl(this,'2026-08-11-ig-0')"></span></div>
+<div class="pc-t">9:30 PM&thinsp;<span class="pc-s">· 12:30 AM Wed</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">12</span></div><div class="pc yt" data-id="2026-08-12-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-08-12-yt-0" onclick="pcbTgl(this,'2026-08-12-yt-0')"></span></div>
+<div class="pc-t">1:00 PM&thinsp;<span class="pc-s">· 4:00 PM</span></div>
+</div><div class="pc ig" data-id="2026-08-12-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-08-12-ig-1" onclick="pcbTgl(this,'2026-08-12-ig-1')"></span></div>
+<div class="pc-t">8:00 PM&thinsp;<span class="pc-s">· 11:00 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">13</span></div><div class="pc yt" data-id="2026-08-13-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-08-13-yt-0" onclick="pcbTgl(this,'2026-08-13-yt-0')"></span></div>
+<div class="pc-t">6:30 PM&thinsp;<span class="pc-s">· 9:30 PM</span></div>
+</div><div class="pc ig" data-id="2026-08-13-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="bd peak">&#9825;</span><span class="pcb" id="pcb-2026-08-13-ig-1" onclick="pcbTgl(this,'2026-08-13-ig-1')"></span></div>
+<div class="pc-t">9:00 PM&thinsp;<span class="pc-s">· 12:00 AM Fri</span></div>
+</div></div><div class="cell pause"><div class="cn"><span class="cnum">14</span></div><div class="p-pause">·</div></div><div class="cell pause"><div class="cn"><span class="cnum">15</span></div><div class="p-pause">·</div></div><div class="cell"><div class="cn"><span class="cnum">16</span></div><div class="pc yt" data-id="2026-08-16-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Video</span><span class="pcb" id="pcb-2026-08-16-yt-0" onclick="pcbTgl(this,'2026-08-16-yt-0')"></span></div>
+<div class="pc-t">3–4 PM&thinsp;<span class="pc-s">· 6–7 PM</span></div>
+</div><div class="pc ig" data-id="2026-08-16-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-08-16-ig-1" onclick="pcbTgl(this,'2026-08-16-ig-1')"></span></div>
+<div class="pc-t">9:45 PM&thinsp;<span class="pc-s">· 12:45 AM Mon</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">17</span></div><div class="pc yt" data-id="2026-08-17-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="bd opt">opt</span><span class="pcb" id="pcb-2026-08-17-yt-0" onclick="pcbTgl(this,'2026-08-17-yt-0')"></span></div>
+<div class="pc-t">12:30 PM&thinsp;<span class="pc-s">· 3:30 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">18</span></div><div class="pc ig" data-id="2026-08-18-ig-0">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-08-18-ig-0" onclick="pcbTgl(this,'2026-08-18-ig-0')"></span></div>
+<div class="pc-t">9:30 PM&thinsp;<span class="pc-s">· 12:30 AM Wed</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">19</span></div><div class="pc yt" data-id="2026-08-19-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-08-19-yt-0" onclick="pcbTgl(this,'2026-08-19-yt-0')"></span></div>
+<div class="pc-t">1:00 PM&thinsp;<span class="pc-s">· 4:00 PM</span></div>
+</div><div class="pc ig" data-id="2026-08-19-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-08-19-ig-1" onclick="pcbTgl(this,'2026-08-19-ig-1')"></span></div>
+<div class="pc-t">8:00 PM&thinsp;<span class="pc-s">· 11:00 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">20</span></div><div class="pc yt" data-id="2026-08-20-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-08-20-yt-0" onclick="pcbTgl(this,'2026-08-20-yt-0')"></span></div>
+<div class="pc-t">6:30 PM&thinsp;<span class="pc-s">· 9:30 PM</span></div>
+</div><div class="pc ig" data-id="2026-08-20-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="bd peak">&#9825;</span><span class="pcb" id="pcb-2026-08-20-ig-1" onclick="pcbTgl(this,'2026-08-20-ig-1')"></span></div>
+<div class="pc-t">9:00 PM&thinsp;<span class="pc-s">· 12:00 AM Fri</span></div>
+</div></div><div class="cell pause"><div class="cn"><span class="cnum">21</span></div><div class="p-pause">·</div></div><div class="cell pause"><div class="cn"><span class="cnum">22</span></div><div class="p-pause">·</div></div><div class="cell"><div class="cn"><span class="cnum">23</span></div><div class="pc yt" data-id="2026-08-23-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Video</span><span class="pcb" id="pcb-2026-08-23-yt-0" onclick="pcbTgl(this,'2026-08-23-yt-0')"></span></div>
+<div class="pc-t">3–4 PM&thinsp;<span class="pc-s">· 6–7 PM</span></div>
+</div><div class="pc ig" data-id="2026-08-23-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-08-23-ig-1" onclick="pcbTgl(this,'2026-08-23-ig-1')"></span></div>
+<div class="pc-t">9:45 PM&thinsp;<span class="pc-s">· 12:45 AM Mon</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">24</span></div><div class="pc yt" data-id="2026-08-24-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="bd opt">opt</span><span class="pcb" id="pcb-2026-08-24-yt-0" onclick="pcbTgl(this,'2026-08-24-yt-0')"></span></div>
+<div class="pc-t">12:30 PM&thinsp;<span class="pc-s">· 3:30 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">25</span></div><div class="pc ig" data-id="2026-08-25-ig-0">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-08-25-ig-0" onclick="pcbTgl(this,'2026-08-25-ig-0')"></span></div>
+<div class="pc-t">9:30 PM&thinsp;<span class="pc-s">· 12:30 AM Wed</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">26</span></div><div class="pc yt" data-id="2026-08-26-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-08-26-yt-0" onclick="pcbTgl(this,'2026-08-26-yt-0')"></span></div>
+<div class="pc-t">1:00 PM&thinsp;<span class="pc-s">· 4:00 PM</span></div>
+</div><div class="pc ig" data-id="2026-08-26-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-08-26-ig-1" onclick="pcbTgl(this,'2026-08-26-ig-1')"></span></div>
+<div class="pc-t">8:00 PM&thinsp;<span class="pc-s">· 11:00 PM</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">27</span></div><div class="pc yt" data-id="2026-08-27-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="pcb" id="pcb-2026-08-27-yt-0" onclick="pcbTgl(this,'2026-08-27-yt-0')"></span></div>
+<div class="pc-t">6:30 PM&thinsp;<span class="pc-s">· 9:30 PM</span></div>
+</div><div class="pc ig" data-id="2026-08-27-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="bd peak">&#9825;</span><span class="pcb" id="pcb-2026-08-27-ig-1" onclick="pcbTgl(this,'2026-08-27-ig-1')"></span></div>
+<div class="pc-t">9:00 PM&thinsp;<span class="pc-s">· 12:00 AM Fri</span></div>
+</div></div><div class="cell pause"><div class="cn"><span class="cnum">28</span></div><div class="p-pause">·</div></div><div class="cell pause"><div class="cn"><span class="cnum">29</span></div><div class="p-pause">·</div></div><div class="cell"><div class="cn"><span class="cnum">30</span></div><div class="pc yt" data-id="2026-08-30-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Video</span><span class="pcb" id="pcb-2026-08-30-yt-0" onclick="pcbTgl(this,'2026-08-30-yt-0')"></span></div>
+<div class="pc-t">3–4 PM&thinsp;<span class="pc-s">· 6–7 PM</span></div>
+</div><div class="pc ig" data-id="2026-08-30-ig-1">
+<div class="pc-row"><span class="dot ig"></span><span class="pc-pl">Instagram Reels</span><span class="pcb" id="pcb-2026-08-30-ig-1" onclick="pcbTgl(this,'2026-08-30-ig-1')"></span></div>
+<div class="pc-t">9:45 PM&thinsp;<span class="pc-s">· 12:45 AM Mon</span></div>
+</div></div><div class="cell"><div class="cn"><span class="cnum">31</span></div><div class="pc yt" data-id="2026-08-31-yt-0">
+<div class="pc-row"><span class="dot yt"></span><span class="pc-pl">YouTube Shorts</span><span class="bd opt">opt</span><span class="pcb" id="pcb-2026-08-31-yt-0" onclick="pcbTgl(this,'2026-08-31-yt-0')"></span></div>
+<div class="pc-t">12:30 PM&thinsp;<span class="pc-s">· 3:30 PM</span></div>
+</div></div><div class="cell empty"></div><div class="cell empty"></div><div class="cell empty"></div><div class="cell empty"></div><div class="cell empty"></div><div class="cell empty"></div></div>
+</div></section>
+</main>
+
+<script>
+
+(function(){
+  try{
+    if(!localStorage.getItem('sch-v2-reset')){
+      Object.keys(localStorage).forEach(function(k){
+        if(k.slice(0,2)==='s:') localStorage.removeItem(k);
+      });
+      localStorage.setItem('sch-v2-reset','1');
+    }
+  }catch(e){}
+})();
+
+const MONTH_IDS = ['m20266', 'm20267', 'm20268'];
+
+// Pearls are generated PER MONTH, absolutely positioned within that
+// month's own section (0..sectionHeight). They physically cannot
+// extend past where that section's content ends — no global
+// measurement, no accumulation, no drift.
+function buildPearlsForMonth(mid){
+  const monthEl = document.getElementById(mid);
+  const layer   = document.getElementById('mp-'+mid);
+  if(!monthEl || !layer) return;
+  layer.innerHTML = '';
+  const h = monthEl.offsetHeight;
+  layer.style.height = h + 'px';
+  if(h < 40) return;
+
+  const perSide = 6;
+  ['l','r'].forEach(function(side){
+    const binH = h / perSide;
+    for(let i=0;i<perSide;i++){
+      const sz = 48 + Math.random()*96;
+      const binStart = i*binH;
+      const jitterCap = i === 0 ? binH*0.3 : (binH - sz*0.4 > 0 ? (binH - sz*0.4) : binH*0.4);
+      const jitter = Math.random()*jitterCap;
+      let top = binStart + jitter;
+      if(top + sz > h) top = Math.max(0, h - sz - 4);
+      const off = -(sz/4) + Math.random()*110;
+
+      const outer = document.createElement('div');
+      outer.className = 'porb';
+      outer.style.width = sz+'px';
+      outer.style.height = sz+'px';
+      outer.style.top = top+'px';
+      if(side==='l') outer.style.left = off+'px';
+      else outer.style.right = off+'px';
+      outer.dataset.sp = (0.15+Math.random()*0.32).toFixed(2);
+
+      const inner = document.createElement('div');
+      inner.className = 'porb-inner';
+      inner.style.setProperty('--dur', (6+Math.random()*3).toFixed(2)+'s');
+      inner.style.setProperty('--del', (-(Math.random()*6)).toFixed(2)+'s');
+      outer.appendChild(inner);
+      layer.appendChild(outer);
+    }
+  });
+}
+
+function buildAllPearls(){
+  MONTH_IDS.forEach(buildPearlsForMonth);
+}
+
+let pTick=false;
+function updateParallax(){
+  const s = window.scrollY;
+  document.querySelectorAll('.porb').forEach(function(el){
+    const sp = parseFloat(el.dataset.sp);
+    el.style.transform = 'translateY(' + (s*(1-sp)) + 'px)';
+  });
+  pTick=false;
+}
+window.addEventListener('scroll',function(){
+  if(!pTick){ requestAnimationFrame(updateParallax); pTick=true; }
+},{passive:true});
+
+function pcbTgl(el,id){
+  el.classList.toggle('checked');
+  const on = el.classList.contains('checked');
+  const card = document.querySelector('[data-id="'+id+'"]');
+  if(card) on ? card.classList.add('done') : card.classList.remove('done');
+  try{ localStorage.setItem('s:'+id, on?'1':'0'); }catch(e){}
+  if(window.fbWrite) window.fbWrite(id, on);
+}
+
+function togM(mid){
+  const b=document.getElementById('body-'+mid);
+  const t=document.getElementById('tog-'+mid);
+  const open=b.style.display==='none';
+  b.style.display=open?'':'none';
+  t.textContent=open?'−':'+';
+  // section height changed — rebuild just this month's pearls to match
+  buildPearlsForMonth(mid);
+}
+
+window.addEventListener('DOMContentLoaded',function(){
+  try{
+    Object.keys(localStorage).forEach(function(k){
+      if(k.slice(0,2)!=='s:')return;
+      const id=k.slice(2);
+      const el=document.getElementById('pcb-'+id);
+      const card=document.querySelector('[data-id="'+id+'"]');
+      const on = localStorage.getItem(k)==='1';
+      if(el) el.classList.toggle('checked', on);
+      if(card) card.classList.toggle('done', on);
+    });
+  }catch(e){}
+
+  buildAllPearls();
+  if(document.fonts && document.fonts.ready){
+    document.fonts.ready.then(buildAllPearls);
+  }
+  setTimeout(buildAllPearls, 500);
+
+  // Dynamically highlight today and dim past days
+  (function(){
+    const now = new Date();
+    const todayStr = now.getFullYear() + '-' +
+      String(now.getMonth()+1).padStart(2,'0') + '-' +
+      String(now.getDate()).padStart(2,'0');
+    document.querySelectorAll('.cell').forEach(function(cell){
+      cell.classList.remove('today','past');
+      const firstPc = cell.querySelector('[data-id]');
+      if(!firstPc) return;
+      const dateStr = firstPc.getAttribute('data-id').slice(0,10);
+      if(dateStr === todayStr) cell.classList.add('today');
+      else if(dateStr < todayStr) cell.classList.add('past');
+    });
+  })();
+});
+
+</script>
+
+<script type="module">
+// Firebase Realtime Database — real cross-device sync.
+// Replace the REPLACE_ME values below with your own Firebase project
+// config (Project Settings > General > Your apps > Web app config).
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAMkHiqFfmteXf5k56fTc4AJZDYTIofnvk",
+  authDomain: "summershinesun-74213.firebaseapp.com",
+  databaseURL: "https://summershinesun-74213-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "summershinesun-74213",
+  storageBucket: "summershinesun-74213.firebasestorage.app",
+  messagingSenderId: "792354214663",
+  appId: "1:792354214663:web:5344e961a29becf0162ba2"
+};
+
+const configured = Object.values(FIREBASE_CONFIG).every(v => v !== "REPLACE_ME");
+
+if(!configured){
+  const notice = document.createElement('div');
+  notice.id = 'fb-setup-notice';
+  notice.style.cssText =
+    'position:fixed;bottom:16px;left:16px;right:16px;max-width:520px;'+
+    'margin:0 auto;background:#fff;color:#49277f;border:1px solid #e0d0f0;'+
+    'border-radius:10px;padding:14px 18px;font-family:Jost,sans-serif;'+
+    'font-size:13px;line-height:1.5;box-shadow:0 6px 24px rgba(73,39,127,.15);'+
+    'z-index:999';
+  notice.innerHTML =
+    'Firebase не настроен — галочки сохраняются только в этом браузере. '+
+    'Чтобы включить синхронизацию между устройствами, замени значения '+
+    '<code>REPLACE_ME</code> в файле на данные твоего проекта Firebase.';
+  document.body.appendChild(notice);
+} else {
+  const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+  const fbdb = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js");
+  const app = initializeApp(FIREBASE_CONFIG);
+  const db  = fbdb.getDatabase(app);
+
+  // Remote -> local: any change from another device updates this page live.
+  fbdb.onValue(fbdb.ref(db, 'schedule'), function(snap){
+    const data = snap.val() || {};
+    Object.entries(data).forEach(function([id, on]){
+      const el   = document.getElementById('pcb-'+id);
+      const card = document.querySelector('[data-id="'+id+'"]');
+      if(el)   el.classList.toggle('checked', !!on);
+      if(card) card.classList.toggle('done', !!on);
+      try{ localStorage.setItem('s:'+id, on ? '1' : '0'); }catch(e){}
+    });
+  });
+
+  // Local -> remote: called from pcbTgl() on every checkbox click.
+  window.fbWrite = function(id, on){
+    fbdb.set(fbdb.ref(db, 'schedule/'+id), on).catch(function(e){
+      console.error('Firebase write failed:', e);
+    });
+  };
+}
+</script>
+</body>
+</html>
